@@ -1,0 +1,5 @@
+/* Debugging CSS for world-db-connector */
+/* If you see this file loaded in network tab, the extension is successfully parsed! */
+#db-connector-debug-flag {
+    display: none;
+}
