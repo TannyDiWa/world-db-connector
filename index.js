@@ -1,6 +1,7 @@
 alert("Extension World DB Connector is successfully loading the JS file!");
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
+import { SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
 import { setLocalVariable } from '../../../variables.js';
 
 async function dbGetHandler(args, value) {
@@ -41,12 +42,29 @@ async function dbGetHandler(args, value) {
 }
 
 jQuery(async () => {
-    const dbGetCommand = new SlashCommand('db-fetch', dbGetHandler)
-        .help('ดึงข้อมูล JSON จาก URL ที่ระบุแล้วบันทึกค่าเก็บไว้เป็น Variable')
-        .addNamedArgument('url', 'API URL ที่ต้องการดึงข้อมูล')
-        .addNamedArgument('var', 'ชื่อตัวแปรรองรับข้อมูลในรูปแบบ JSON (เมื่อเรียกใช้ให้เข้าถึงผ่าน {{getvar::ชื่อตัวแปร}})');
+    // ใช้ Syntax แบบใหม่ล่าสุดของ SillyTavern แทนแบบเดิมที่โดนถอดไป
+    const dbGetCommand = SlashCommand.fromProps({
+        name: 'db-fetch',
+        callback: dbGetHandler,
+        returns: 'string',
+        helpString: 'ดึงข้อมูล JSON จาก URL ที่ระบุแล้วบันทึกค่าเก็บไว้เป็น Variable',
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'url',
+                description: 'API URL ที่ต้องการดึงข้อมูล',
+                typeList: ['string'],
+                isRequired: true
+            }),
+            SlashCommandNamedArgument.fromProps({
+                name: 'var',
+                description: 'ชื่อตัวแปรรองรับข้อมูลในรูปแบบ JSON (เมื่อเรียกใช้ให้เข้าถึงผ่าน {{getvar::ชื่อตัวแปร}})',
+                typeList: ['string'],
+                isRequired: true
+            })
+        ]
+    });
 
     SlashCommandParser.addCommandObject(dbGetCommand);
 
-    console.log("[World DB Connector] Extension Loaded Successfully! (/db-get command registered)");
+    console.log("[World DB Connector] Extension Loaded Successfully! (/db-fetch command registered)");
 });
