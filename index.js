@@ -75,15 +75,22 @@ jQuery(async () => {
         // 2. ลงทะเบียน Macro: {{dbfetch::url::var}} สำหรับใช้ใน Lorebook
         MacroRegistry.registerMacro("dbfetch", {
             category: MacroCategory.VARIABLE,
-            unnamedArgs: [
-                { name: "url", type: MacroValueType.STRING, description: "API URL" },
-                { name: "var", type: MacroValueType.STRING, description: "Variable Name" }
-            ],
+            description: "ดึงข้อมูลจาก URL ด้วยเครื่องหมาย :: เช่น {{dbfetch::http://...::var}}",
             handler: (ctx) => {
-                const [url, varName] = ctx.unnamedArgs;
+                // ใช้ rawArgs และแยกด้วย :: เพื่อไม่ให้สับสนกับ : ใน URL
+                // rawArgs จะขึ้นต้นด้วยตัวแบ่งเสมอ (เช่น :http://...::var)
+                const separator = ctx.rawArgs[0];
+                const cleanArgs = ctx.rawArgs.substring(1);
+                const parts = cleanArgs.split("::");
+                
+                const url = parts[0]?.trim();
+                const varName = parts[1]?.trim();
+
                 if (url && varName) {
-                    console.log(`[DB Connector] Lorebook Macro triggered: ${url} -> ${varName}`);
+                    console.log(`[DB Connector] Macro triggered: ${url} -> ${varName}`);
                     dbGetHandler({ url, var: varName }, "");
+                } else {
+                    console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}");
                 }
                 return ""; // คืนค่าว่างเพื่อให้ Prompt สะอาด
             }
