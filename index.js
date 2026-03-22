@@ -77,11 +77,9 @@ jQuery(async () => {
             category: MacroCategory.VARIABLE,
             description: "ดึงข้อมูลจาก URL ด้วยเครื่องหมาย :: เช่น {{dbfetch::http://...::var}}",
             handler: (ctx) => {
-                // ใช้ rawArgs และแยกด้วย :: เพื่อไม่ให้สับสนกับ : ใน URL
-                // rawArgs จะขึ้นต้นด้วยตัวแบ่งเสมอ (เช่น :http://...::var)
-                const separator = ctx.rawArgs[0];
-                const cleanArgs = ctx.rawArgs.substring(1);
-                const parts = cleanArgs.split("::");
+                // ใช้การ Join และ Split เพื่อรองรับทั้งแบบ : และ :: และไม่สับสนกับ : ใน URL
+                const fullInput = ctx.args.join("::");
+                const parts = fullInput.split("::");
                 
                 const url = parts[0]?.trim();
                 const varName = parts[1]?.trim();
@@ -90,7 +88,7 @@ jQuery(async () => {
                     console.log(`[DB Connector] Macro triggered: ${url} -> ${varName}`);
                     dbGetHandler({ url, var: varName }, "");
                 } else {
-                    console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}");
+                    console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}. Got:", fullInput);
                 }
                 return ""; // คืนค่าว่างเพื่อให้ Prompt สะอาด
             }
