@@ -1,10 +1,10 @@
-import { SlashCommand } from '../../slash-commands/SlashCommand.js';
-import { SlashCommandParser } from '../../slash-commands/SlashCommandParser.js';
-import { SlashCommandNamedArgument } from '../../slash-commands/SlashCommandArgument.js';
-import { ARGUMENT_TYPE } from '../../slash-commands/SlashCommandArgument.js';
-import { setLocalVariable } from '../../variables.js';
-import { eventSource, event_types } from '../../../script.js';
-import { MacrosParser } from '../../macros.js';
+import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
+import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
+import { SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
+import { ARGUMENT_TYPE } from '../../../slash-commands/SlashCommandArgument.js';
+import { setLocalVariable } from '../../../variables.js';
+import { eventSource, event_types } from '../../../../script.js';
+import { MacroRegistry, MacroCategory, MacroValueType } from '../../../macros/macro-system.js';
 
 async function dbGetHandler(args, value) {
     const fetchUrl = args.url;
@@ -66,22 +66,38 @@ jQuery(async () => {
         ]
     });
     SlashCommandParser.addCommandObject(dbGetCommand);
-
     // 2. ลงทะเบียน Macro: {{dbfetch::url::var}} สำหรับใช้ใน Lorebook
-    // ระบบจะรันคำสั่งนี้ทันทีที่ Lorebook Entry ทำงาน
-    MacrosParser.registerMacro("dbfetch", (url, varName) => {
-        if (url && varName) {
-            console.log(`[DB Connector] Lorebook Macro triggered: ${url} -> ${varName}`);
-            dbGetHandler({ url, var: varName });
+    // ระบบจะรันคำสั่งนี้ทันทีที่ Lorebook Entry ทำงาน และดึงข้อมูลจาก Database มาเก็บใน Variable
+    MacroRegistry.registerMacro("dbfetch", {
+        category: MacroCategory.VARIABLE,
+        unnamedArgs: [
+            {
+                name: "url",
+                type: MacroValueType.STRING,
+                description: "API URL ที่ต้องการดึงข้อมูล",
+                isRequired: true
+            },
+            {
+                name: "var",
+                type: MacroValueType.STRING,
+                description: "ชื่อตัวแปรที่ต้องการบันทึก",
+                isRequired: true
+            }
+        ],
+        handler: (ctx) => {
+            const [url, varName] = ctx.unnamedArgs;
+            if (url && varName) {
+                console.log(`[DB Connector] Lorebook Macro triggered: ${url} -> ${varName}`);
+                dbGetHandler({ url, var: varName });
+            }
+            return ""; // คืนค่าว่างเพื่อให้ Prompt สะอาด
         }
-        return ""; // คืนค่าว่างเพื่อให้ Prompt สะอาด
-    }, "ดึงข้อมูลจาก Database อัตโนมัติ (ใช้ใน Lorebook ได้)");
+    });
 
     // 3. ระบบความสดใหม่ของข้อมูล (Message Sent Event)
-    // รันทุกครั้งที่ผู้ใช้ส่งข้อความ เพื่อให้ตัวแปรพร้อมใช้งานเสมอ
     eventSource.on(event_types.MESSAGE_SENT, async () => {
         console.log("[DB Connector] Heartbeat: Checking for auto-updates...");
     });
 
-    console.log("[World DB Connector] Extension Fully Armed! (Commands, Macros, and Events active)");
+    console.log("[World DB Connector] Extension Fully Armed with MacroRegistry support!");
 });
