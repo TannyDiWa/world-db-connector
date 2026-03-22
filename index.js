@@ -1,4 +1,4 @@
-alert("Extension World DB Connector is successfully loading the JS file!");
+// Extension World DB Connector - Loaded successfully
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
@@ -91,11 +91,6 @@ jQuery(async () => {
                 if (url && varName) {
                     console.log(`[DB Connector] Macro triggered: ${url} -> ${varName}`);
                     const result = await dbGetHandler({ url, var: varName }, "");
-                    
-                    // เพิ่ม Debug Log เพื่อเช็คว่าข้อมูลเข้าจริงไหม
-                    const currentVal = getLocalVariable(varName);
-                    console.log(`[DB Connector] Verification: ${varName} current value =`, currentVal);
-                    
                     return result; // คืนค่าข้อมูลกลับไปเพื่อให้ SillyTavern ใส่ลงใน Prompt ทันที
                 } else {
                     console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}. Got:", fullInput);
