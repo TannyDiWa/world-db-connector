@@ -1,3 +1,4 @@
+alert("Extension World DB Connector is successfully loading the JS file!");
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { setLocalVariable } from '../../../variables.js';
