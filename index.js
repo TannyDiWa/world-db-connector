@@ -164,10 +164,17 @@ jQuery(async () => {
                 if (url && varName) {
                     console.log(`[DB Connector] Macro triggered: ${url} -> ${varName}`);
                     const rawResult = await dbGetHandler({ url, var: varName }, "");
+                    console.log(`[DB Connector] dbfetch rawResult:`, rawResult);
                     if (!rawResult) return "";
                     
                     try {
                         const data = JSON.parse(rawResult);
+                        
+                        // ถ้าเป็นแค่ Object ว่าง หรือไม่ใช่ Object ให้คืนค่าดิบ
+                        if (!data || Object.keys(data).length === 0) {
+                            return rawResult; 
+                        }
+
                         const flatStats = flattenObject(data);
                         let output = `[Stats for ${varName}]:\n`;
                         for (const [k, v] of Object.entries(flatStats)) {
@@ -175,10 +182,11 @@ jQuery(async () => {
                         }
                         return output;
                     } catch (e) {
-                        return rawResult; // ถ้าไม่ใช่ JSON ให้คืนค่าดิบ
+                        console.error("[DB Connector] JSON Parse failed in macro:", e);
+                        return rawResult; // คืนค่าดิบกรณี Parse ไม่ได้
                     }
                 }
- else {
+                else {
                     console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}. Got:", fullInput);
                 }
                 return ""; // คืนค่าว่างกรณีผิดพลาด
@@ -223,6 +231,5 @@ jQuery(async () => {
         console.warn("[World DB Connector] Macros/Events registration failed (but /db-fetch is still active):", e);
     }
 
-    console.log("[World DB Connector] Extension Loaded Successfully! (/db-fetch command registered)");
+    console.log("[World DB Connector] Extension Loaded Successfully! (VERSION: 1.6)");
 });
-ห
