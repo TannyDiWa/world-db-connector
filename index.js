@@ -10,6 +10,21 @@ function getDeep(obj, path) {
     return path.split('.').reduce((acc, part) => acc && acc[part], obj);
 }
 
+// Helper: ทำข้อมูลให้เป็นแบนราบ (Flatten) เพื่อให้ AI อ่านง่ายขึ้น
+function flattenObject(obj, prefix = '') {
+    let result = {};
+    for (const key in obj) {
+        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+            Object.assign(result, flattenObject(obj[key], prefix + key + ' '));
+        } else {
+            // เปลี่ยน . เป็นช่องว่างหรือตัวช่วยอ่านเพื่อให้ AI เข้าใจบริบทดีขึ้น
+            const cleanKey = prefix + key;
+            result[cleanKey] = obj[key];
+        }
+    }
+    return result;
+}
+
 async function dbGetHandler(args, value) {
     const fetchUrl = args.url;
     const varName = args.var;
@@ -42,17 +57,11 @@ async function dbGetHandler(args, value) {
             const { setExtensionPrompt, extension_prompt_types, extension_prompt_roles } = await import('../../../../script.js');
             
             // สร้างสรุปแบบอ่านง่ายสำหรับ AI (System Note)
-            let summary = `[System Note: ข้อมูลล่าสุดจาก Database (${varName})]:\n`;
-            if (typeof data === 'object') {
-                for (const [key, val] of Object.entries(data)) {
-                    if (typeof val === 'object') {
-                        summary += `- ${key}: ${JSON.stringify(val)}\n`;
-                    } else {
-                        summary += `- ${key}: ${val}\n`;
-                    }
-                }
-            } else {
-                summary += dataString;
+            let summary = `[System Note: Important Character Stats (${varName})]:\n`;
+            const flatData = typeof data === 'object' ? flattenObject(data) : { [varName]: data };
+            
+            for (const [key, val] of Object.entries(flatData)) {
+                summary += `- ${key}: ${val}\n`;
             }
 
             // ฉีดเข้า Prompt ในฐานะ System Role (ความลึก 0 คือล่าสุด)
@@ -105,6 +114,31 @@ jQuery(async () => {
 
     SlashCommandParser.addCommandObject(dbGetCommand);
 
+    // 1.1 เพิ่มคำสั่ง /db-inspect เพื่อตรวจสอบค่าตัวแปร
+    const dbInspectCommand = SlashCommand.fromProps({
+        name: 'db-inspect',
+        callback: (args) => {
+            const varName = args.var;
+            const val = getLocalVariable(varName);
+            if (!val) {
+                toastr.info(`ไม่พบตัวแปรชื่อ: ${varName}`, "DB Connector");
+                return "";
+            }
+            const message = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
+            callGenericPopup(`<pre>${message}</pre>`, "Variable Inspector: " + varName);
+            return message;
+        },
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'var',
+                description: 'ชื่อตัวแปรที่ต้องการตรวจสอบ',
+                typeList: ['string'],
+                isRequired: true
+            })
+        ]
+    });
+    SlashCommandParser.addCommandObject(dbInspectCommand);
+
     // DYNAMIC IMPORT สำหรับระบบ Macro และ Events (ช่วยป้องกันกรณี Path ไฟล์เปลี่ยนไม่ให้ Extension พังทั้งไฟล์)
     try {
         // ดึง MacroRegistry และ Event มาจากตำแหน่งที่ SillyTavern ใช้งาน
@@ -129,9 +163,22 @@ jQuery(async () => {
 
                 if (url && varName) {
                     console.log(`[DB Connector] Macro triggered: ${url} -> ${varName}`);
-                    const result = await dbGetHandler({ url, var: varName }, "");
-                    return result; // คืนค่าข้อมูลกลับไปเพื่อให้ SillyTavern ใส่ลงใน Prompt ทันที
-                } else {
+                    const rawResult = await dbGetHandler({ url, var: varName }, "");
+                    if (!rawResult) return "";
+                    
+                    try {
+                        const data = JSON.parse(rawResult);
+                        const flatStats = flattenObject(data);
+                        let output = `[Stats for ${varName}]:\n`;
+                        for (const [k, v] of Object.entries(flatStats)) {
+                            output += `- ${k}: ${v}\n`;
+                        }
+                        return output;
+                    } catch (e) {
+                        return rawResult; // ถ้าไม่ใช่ JSON ให้คืนค่าดิบ
+                    }
+                }
+ else {
                     console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}. Got:", fullInput);
                 }
                 return ""; // คืนค่าว่างกรณีผิดพลาด
@@ -157,7 +204,9 @@ jQuery(async () => {
                 try {
                     const data = typeof json === 'string' ? JSON.parse(json) : json;
                     const value = getDeep(data, path);
-                    return value !== undefined ? String(value) : "";
+                    const result = value !== undefined ? String(value) : "";
+                    console.log(`[DB Connector] dbget triggered: ${varName}.${path} ->`, result);
+                    return result;
                 } catch (e) {
                     return "";
                 }
@@ -176,3 +225,4 @@ jQuery(async () => {
 
     console.log("[World DB Connector] Extension Loaded Successfully! (/db-fetch command registered)");
 });
+ห
