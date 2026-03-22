@@ -76,6 +76,10 @@ jQuery(async () => {
         MacroRegistry.registerMacro("dbfetch", {
             category: MacroCategory.VARIABLE,
             description: "ดึงข้อมูลจาก URL ด้วยเครื่องหมาย :: เช่น {{dbfetch::http://...::var}}",
+            unnamedArgs: [
+                { name: "url", type: MacroValueType.STRING, optional: true },
+                { name: "var", type: MacroValueType.STRING, optional: true }
+            ],
             handler: (ctx) => {
                 // ใช้การ Join และ Split เพื่อรองรับทั้งแบบ : และ :: และไม่สับสนกับ : ใน URL
                 const fullInput = ctx.args.join("::");
