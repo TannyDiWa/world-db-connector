@@ -80,7 +80,7 @@ jQuery(async () => {
                 { name: "url", type: MacroValueType.STRING, optional: true },
                 { name: "var", type: MacroValueType.STRING, optional: true }
             ],
-            handler: (ctx) => {
+            handler: async (ctx) => {
                 // ใช้การ Join และ Split เพื่อรองรับทั้งแบบ : และ :: และไม่สับสนกับ : ใน URL
                 const fullInput = ctx.args.join("::");
                 const parts = fullInput.split("::");
@@ -90,7 +90,7 @@ jQuery(async () => {
 
                 if (url && varName) {
                     console.log(`[DB Connector] Macro triggered: ${url} -> ${varName}`);
-                    dbGetHandler({ url, var: varName }, "");
+                    await dbGetHandler({ url, var: varName }, "");
                 } else {
                     console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}. Got:", fullInput);
                 }
