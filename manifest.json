@@ -1,0 +1,11 @@
+{
+    "display_name": "World DB Connector",
+    "loading_order": 50,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "",
+    "author": "Tannyboyz",
+    "version": "1.0.0",
+    "homePage": "https://github.com/TannyDiWa/world-db-connector"
+}
