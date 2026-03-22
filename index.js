@@ -4,6 +4,12 @@ import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.j
 import { SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
 import { setLocalVariable, getLocalVariable } from '../../../variables.js';
 
+// Helper: ดึงข้อมูลแบบ Nested (เช่น stats.affection)
+function getDeep(obj, path) {
+    if (!path) return obj;
+    return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+}
+
 async function dbGetHandler(args, value) {
     const fetchUrl = args.url;
     const varName = args.var;
@@ -30,6 +36,39 @@ async function dbGetHandler(args, value) {
 
         // บันทึกลงใน Local Variable ของ SillyTavern
         setLocalVariable(varName, dataString);
+
+        // --- เพิ่มการฉีดข้อมูลเข้า Prompt โดยตรง ---
+        try {
+            const { setExtensionPrompt, extension_prompt_types, extension_prompt_roles } = await import('../../../../script.js');
+            
+            // สร้างสรุปแบบอ่านง่ายสำหรับ AI (System Note)
+            let summary = `[System Note: ข้อมูลล่าสุดจาก Database (${varName})]:\n`;
+            if (typeof data === 'object') {
+                for (const [key, val] of Object.entries(data)) {
+                    if (typeof val === 'object') {
+                        summary += `- ${key}: ${JSON.stringify(val)}\n`;
+                    } else {
+                        summary += `- ${key}: ${val}\n`;
+                    }
+                }
+            } else {
+                summary += dataString;
+            }
+
+            // ฉีดเข้า Prompt ในฐานะ System Role (ความลึก 0 คือล่าสุด)
+            setExtensionPrompt(
+                `db_connector_${varName}`, 
+                summary, 
+                extension_prompt_types.IN_PROMPT, 
+                0, 
+                true, 
+                extension_prompt_roles.SYSTEM
+            );
+            console.log(`[DB Connector] Prompt Injected for ${varName}`);
+        } catch (e) {
+            console.warn("[DB Connector] Prompt injection failed:", e);
+        }
+        // ---------------------------------------
 
         toastr.success(`ข้อมูลถูกบันทึกลงในตัวแปร: ${varName} เรียบร้อยแล้ว`, "DB Connector: Success");
         return dataString;
@@ -96,6 +135,32 @@ jQuery(async () => {
                     console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}. Got:", fullInput);
                 }
                 return ""; // คืนค่าว่างกรณีผิดพลาด
+            }
+        });
+
+        // 2.1 ลงทะเบียน Macro: {{dbget::varName::path}} สำหรับดึงค่าเฉพาะส่วน
+        MacroRegistry.registerMacro("dbget", {
+            category: MacroCategory.VARIABLE,
+            description: "ดึงค่าจาก JSON ในตัวแปรตาม Path เช่น {{dbget::Alya.stats::stats.affection}}",
+            unnamedArgs: [
+                { name: "varName", type: MacroValueType.STRING, optional: false },
+                { name: "path", type: MacroValueType.STRING, optional: false }
+            ],
+            handler: (ctx) => {
+                const varName = ctx.args[0]?.trim();
+                const path = ctx.args[1]?.trim();
+                if (!varName || !path) return "";
+
+                const json = getLocalVariable(varName);
+                if (!json) return "";
+
+                try {
+                    const data = typeof json === 'string' ? JSON.parse(json) : json;
+                    const value = getDeep(data, path);
+                    return value !== undefined ? String(value) : "";
+                } catch (e) {
+                    return "";
+                }
             }
         });
 
