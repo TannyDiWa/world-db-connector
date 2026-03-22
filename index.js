@@ -2,10 +2,7 @@ alert("Extension World DB Connector is successfully loading the JS file!");
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
-import { ARGUMENT_TYPE } from '../../../slash-commands/SlashCommandArgument.js';
 import { setLocalVariable } from '../../../variables.js';
-import { eventSource, event_types } from '../../../../script.js';
-import { MacroRegistry, MacroCategory, MacroValueType } from '../../../macros/macro-system.js';
 
 async function dbGetHandler(args, value) {
     const fetchUrl = args.url;
@@ -45,7 +42,7 @@ async function dbGetHandler(args, value) {
 }
 
 jQuery(async () => {
-    // ใช้ Syntax แบบใหม่ล่าสุดของ SillyTavern แทนแบบเดิมที่โดนถอดไป
+    // 1. ลงทะเบียนคำสั่ง Slash Command: /db-fetch
     const dbGetCommand = SlashCommand.fromProps({
         name: 'db-fetch',
         callback: dbGetHandler,
@@ -69,38 +66,38 @@ jQuery(async () => {
 
     SlashCommandParser.addCommandObject(dbGetCommand);
 
-    // 2. ลงทะเบียน Macro: {{dbfetch::url::var}} สำหรับใช้ใน Lorebook
-    // ระบบจะรันคำสั่งนี้ทันทีที่ Lorebook Entry ทำงาน และดึงข้อมูลจาก Database มาเก็บใน Variable
-    MacroRegistry.registerMacro("dbfetch", {
-        category: MacroCategory.VARIABLE,
-        unnamedArgs: [
-            {
-                name: "url",
-                type: MacroValueType.STRING,
-                description: "API URL ที่ต้องการดึงข้อมูล",
-                isRequired: true
-            },
-            {
-                name: "var",
-                type: MacroValueType.STRING,
-                description: "ชื่อตัวแปรที่ต้องการบันทึก",
-                isRequired: true
-            }
-        ],
-        handler: (ctx) => {
-            const [url, varName] = ctx.unnamedArgs;
-            if (url && varName) {
-                console.log(`[DB Connector] Lorebook Macro triggered: ${url} -> ${varName}`);
-                dbGetHandler({ url, var: varName }, "");
-            }
-            return ""; // คืนค่าว่างเพื่อให้ Prompt สะอาด
-        }
-    });
+    // DYNAMIC IMPORT สำหรับระบบ Macro และ Events (ช่วยป้องกันกรณี Path ไฟล์เปลี่ยนไม่ให้ Extension พังทั้งไฟล์)
+    try {
+        // ดึง MacroRegistry และ Event มาจากตำแหน่งที่ SillyTavern ใช้งาน
+        const { MacroRegistry, MacroCategory, MacroValueType } = await import('../../../macros/engine/MacroRegistry.js');
+        const { eventSource, event_types } = await import('../../../../script.js');
 
-    // 3. ระบบความสดใหม่ของข้อมูล (Message Sent Event)
-    eventSource.on(event_types.MESSAGE_SENT, async () => {
-        console.log("[DB Connector] Heartbeat: Checking for auto-updates...");
-    });
+        // 2. ลงทะเบียน Macro: {{dbfetch::url::var}} สำหรับใช้ใน Lorebook
+        MacroRegistry.registerMacro("dbfetch", {
+            category: MacroCategory.VARIABLE,
+            unnamedArgs: [
+                { name: "url", type: MacroValueType.STRING, description: "API URL" },
+                { name: "var", type: MacroValueType.STRING, description: "Variable Name" }
+            ],
+            handler: (ctx) => {
+                const [url, varName] = ctx.unnamedArgs;
+                if (url && varName) {
+                    console.log(`[DB Connector] Lorebook Macro triggered: ${url} -> ${varName}`);
+                    dbGetHandler({ url, var: varName }, "");
+                }
+                return ""; // คืนค่าว่างเพื่อให้ Prompt สะอาด
+            }
+        });
 
-    console.log("[World DB Connector] Extension Fully Armed with MacroRegistry support!");
+        // 3. ระบบความสดใหม่ของข้อมูล (Message Sent Event)
+        eventSource.on(event_types.MESSAGE_SENT, async () => {
+            console.log("[DB Connector] Heartbeat active.");
+        });
+
+        console.log("[World DB Connector] Macro and Events registered successfully!");
+    } catch (e) {
+        console.warn("[World DB Connector] Macros/Events registration failed (but /db-fetch is still active):", e);
+    }
+
+    console.log("[World DB Connector] Extension Loaded Successfully! (/db-fetch command registered)");
 });
