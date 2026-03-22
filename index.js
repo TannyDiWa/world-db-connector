@@ -40,7 +40,7 @@ async function dbGetHandler(args, value) {
 }
 
 jQuery(async () => {
-    const dbGetCommand = new SlashCommand('db-get', dbGetHandler)
+    const dbGetCommand = new SlashCommand('db-fetch', dbGetHandler)
         .help('ดึงข้อมูล JSON จาก URL ที่ระบุแล้วบันทึกค่าเก็บไว้เป็น Variable')
         .addNamedArgument('url', 'API URL ที่ต้องการดึงข้อมูล')
         .addNamedArgument('var', 'ชื่อตัวแปรรองรับข้อมูลในรูปแบบ JSON (เมื่อเรียกใช้ให้เข้าถึงผ่าน {{getvar::ชื่อตัวแปร}})');
