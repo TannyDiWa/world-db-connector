@@ -1,3 +1,4 @@
+alert("Extension World DB Connector is successfully loading the JS file!");
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
@@ -30,7 +31,7 @@ async function dbGetHandler(args, value) {
         const data = await response.json();
         const dataString = JSON.stringify(data);
 
-        // บันทึกลงใน Local Variable ของ SillyTavern (ต้องเป็น String)
+        // บันทึกลงใน Local Variable ของ SillyTavern
         setLocalVariable(varName, dataString);
 
         toastr.success(`ข้อมูลถูกบันทึกลงในตัวแปร: ${varName} เรียบร้อยแล้ว`, "DB Connector: Success");
@@ -44,7 +45,7 @@ async function dbGetHandler(args, value) {
 }
 
 jQuery(async () => {
-    // 1. ลงทะเบียนคำสั่ง Slash Command: /db-fetch
+    // ใช้ Syntax แบบใหม่ล่าสุดของ SillyTavern แทนแบบเดิมที่โดนถอดไป
     const dbGetCommand = SlashCommand.fromProps({
         name: 'db-fetch',
         callback: dbGetHandler,
@@ -54,18 +55,20 @@ jQuery(async () => {
             SlashCommandNamedArgument.fromProps({
                 name: 'url',
                 description: 'API URL ที่ต้องการดึงข้อมูล',
-                typeList: [ARGUMENT_TYPE.STRING],
+                typeList: ['string'],
                 isRequired: true
             }),
             SlashCommandNamedArgument.fromProps({
                 name: 'var',
                 description: 'ชื่อตัวแปรรองรับข้อมูลในรูปแบบ JSON (เมื่อเรียกใช้ให้เข้าถึงผ่าน {{getvar::ชื่อตัวแปร}})',
-                typeList: [ARGUMENT_TYPE.STRING],
+                typeList: ['string'],
                 isRequired: true
             })
         ]
     });
+
     SlashCommandParser.addCommandObject(dbGetCommand);
+
     // 2. ลงทะเบียน Macro: {{dbfetch::url::var}} สำหรับใช้ใน Lorebook
     // ระบบจะรันคำสั่งนี้ทันทีที่ Lorebook Entry ทำงาน และดึงข้อมูลจาก Database มาเก็บใน Variable
     MacroRegistry.registerMacro("dbfetch", {
@@ -88,7 +91,7 @@ jQuery(async () => {
             const [url, varName] = ctx.unnamedArgs;
             if (url && varName) {
                 console.log(`[DB Connector] Lorebook Macro triggered: ${url} -> ${varName}`);
-                dbGetHandler({ url, var: varName });
+                dbGetHandler({ url, var: varName }, "");
             }
             return ""; // คืนค่าว่างเพื่อให้ Prompt สะอาด
         }
