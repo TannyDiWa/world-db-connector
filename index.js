@@ -1,29 +1,7 @@
-// Extension World DB Connector - Loaded successfully
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
-import { setLocalVariable, getLocalVariable } from '../../../variables.js';
-
-// Helper: ดึงข้อมูลแบบ Nested (เช่น stats.affection)
-function getDeep(obj, path) {
-    if (!path) return obj;
-    return path.split('.').reduce((acc, part) => acc && acc[part], obj);
-}
-
-// Helper: ทำข้อมูลให้เป็นแบนราบ (Flatten) เพื่อให้ AI อ่านง่ายขึ้น
-function flattenObject(obj, prefix = '') {
-    let result = {};
-    for (const key in obj) {
-        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-            Object.assign(result, flattenObject(obj[key], prefix + key + ' '));
-        } else {
-            // เปลี่ยน . เป็นช่องว่างหรือตัวช่วยอ่านเพื่อให้ AI เข้าใจบริบทดีขึ้น
-            const cleanKey = prefix + key;
-            result[cleanKey] = obj[key];
-        }
-    }
-    return result;
-}
+import { setLocalVariable } from '../../../variables.js';
 
 async function dbGetHandler(args, value) {
     const fetchUrl = args.url;
@@ -51,33 +29,6 @@ async function dbGetHandler(args, value) {
 
         // บันทึกลงใน Local Variable ของ SillyTavern
         setLocalVariable(varName, dataString);
-
-        // --- เพิ่มการฉีดข้อมูลเข้า Prompt โดยตรง ---
-        try {
-            const { setExtensionPrompt, extension_prompt_types, extension_prompt_roles } = await import('../../../../script.js');
-            
-            // สร้างสรุปแบบอ่านง่ายสำหรับ AI (System Note)
-            let summary = `[System Note: Important Character Stats (${varName})]:\n`;
-            const flatData = typeof data === 'object' ? flattenObject(data) : { [varName]: data };
-            
-            for (const [key, val] of Object.entries(flatData)) {
-                summary += `- ${key}: ${val}\n`;
-            }
-
-            // ฉีดเข้า Prompt ในฐานะ System Role (ความลึก 0 คือล่าสุด)
-            setExtensionPrompt(
-                `db_connector_${varName}`, 
-                summary, 
-                extension_prompt_types.IN_PROMPT, 
-                0, 
-                true, 
-                extension_prompt_roles.SYSTEM
-            );
-            console.log(`[DB Connector] Prompt Injected for ${varName}`);
-        } catch (e) {
-            console.warn("[DB Connector] Prompt injection failed:", e);
-        }
-        // ---------------------------------------
 
         toastr.success(`ข้อมูลถูกบันทึกลงในตัวแปร: ${varName} เรียบร้อยแล้ว`, "DB Connector: Success");
         return dataString;
@@ -114,31 +65,6 @@ jQuery(async () => {
 
     SlashCommandParser.addCommandObject(dbGetCommand);
 
-    // 1.1 เพิ่มคำสั่ง /db-inspect เพื่อตรวจสอบค่าตัวแปร
-    const dbInspectCommand = SlashCommand.fromProps({
-        name: 'db-inspect',
-        callback: (args) => {
-            const varName = args.var;
-            const val = getLocalVariable(varName);
-            if (!val) {
-                toastr.info(`ไม่พบตัวแปรชื่อ: ${varName}`, "DB Connector");
-                return "";
-            }
-            const message = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
-            callGenericPopup(`<pre>${message}</pre>`, "Variable Inspector: " + varName);
-            return message;
-        },
-        namedArgumentList: [
-            SlashCommandNamedArgument.fromProps({
-                name: 'var',
-                description: 'ชื่อตัวแปรที่ต้องการตรวจสอบ',
-                typeList: ['string'],
-                isRequired: true
-            })
-        ]
-    });
-    SlashCommandParser.addCommandObject(dbInspectCommand);
-
     // DYNAMIC IMPORT สำหรับระบบ Macro และ Events (ช่วยป้องกันกรณี Path ไฟล์เปลี่ยนไม่ให้ Extension พังทั้งไฟล์)
     try {
         // ดึง MacroRegistry และ Event มาจากตำแหน่งที่ SillyTavern ใช้งาน
@@ -153,7 +79,7 @@ jQuery(async () => {
                 { name: "url", type: MacroValueType.STRING, optional: true },
                 { name: "var", type: MacroValueType.STRING, optional: true }
             ],
-            handler: async (ctx) => {
+            handler: (ctx) => {
                 // ใช้การ Join และ Split เพื่อรองรับทั้งแบบ : และ :: และไม่สับสนกับ : ใน URL
                 const fullInput = ctx.args.join("::");
                 const parts = fullInput.split("::");
@@ -163,61 +89,11 @@ jQuery(async () => {
 
                 if (url && varName) {
                     console.log(`[DB Connector] Macro triggered: ${url} -> ${varName}`);
-                    const rawResult = await dbGetHandler({ url, var: varName }, "");
-                    console.log(`[DB Connector] dbfetch rawResult:`, rawResult);
-                    if (!rawResult) return "";
-                    
-                    try {
-                        const data = JSON.parse(rawResult);
-                        
-                        // ถ้าเป็นแค่ Object ว่าง หรือไม่ใช่ Object ให้คืนค่าดิบ
-                        if (!data || Object.keys(data).length === 0) {
-                            return rawResult; 
-                        }
-
-                        const flatStats = flattenObject(data);
-                        let output = `[Stats for ${varName}]:\n`;
-                        for (const [k, v] of Object.entries(flatStats)) {
-                            output += `- ${k}: ${v}\n`;
-                        }
-                        return output;
-                    } catch (e) {
-                        console.error("[DB Connector] JSON Parse failed in macro:", e);
-                        return rawResult; // คืนค่าดิบกรณี Parse ไม่ได้
-                    }
-                }
-                else {
+                    dbGetHandler({ url, var: varName }, "");
+                } else {
                     console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}. Got:", fullInput);
                 }
-                return ""; // คืนค่าว่างกรณีผิดพลาด
-            }
-        });
-
-        // 2.1 ลงทะเบียน Macro: {{dbget::varName::path}} สำหรับดึงค่าเฉพาะส่วน
-        MacroRegistry.registerMacro("dbget", {
-            category: MacroCategory.VARIABLE,
-            description: "ดึงค่าจาก JSON ในตัวแปรตาม Path เช่น {{dbget::Alya.stats::stats.affection}}",
-            unnamedArgs: [
-                { name: "varName", type: MacroValueType.STRING, optional: false },
-                { name: "path", type: MacroValueType.STRING, optional: false }
-            ],
-            handler: (ctx) => {
-                const varName = ctx.args[0]?.trim();
-                const path = ctx.args[1]?.trim();
-                if (!varName || !path) return "";
-
-                const json = getLocalVariable(varName);
-                if (!json) return "";
-
-                try {
-                    const data = typeof json === 'string' ? JSON.parse(json) : json;
-                    const value = getDeep(data, path);
-                    const result = value !== undefined ? String(value) : "";
-                    console.log(`[DB Connector] dbget triggered: ${varName}.${path} ->`, result);
-                    return result;
-                } catch (e) {
-                    return "";
-                }
+                return ""; // คืนค่าว่างเพื่อให้ Prompt สะอาด
             }
         });
 
@@ -231,5 +107,5 @@ jQuery(async () => {
         console.warn("[World DB Connector] Macros/Events registration failed (but /db-fetch is still active):", e);
     }
 
-    console.log("[World DB Connector] Extension Loaded Successfully! (VERSION: 1.6)");
+    console.log("[World DB Connector] Extension Loaded Successfully! (/db-fetch command registered)");
 });
