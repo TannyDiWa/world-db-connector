@@ -79,7 +79,7 @@ jQuery(async () => {
                 { name: "url", type: MacroValueType.STRING, optional: true },
                 { name: "var", type: MacroValueType.STRING, optional: true }
             ],
-            handler: async (ctx) => {
+            handler: (ctx) => {
                 const fullInput = ctx.args.join("::");
                 const parts = fullInput.split("::");
                 const url = parts[0]?.trim();
@@ -87,24 +87,29 @@ jQuery(async () => {
 
                 if (url && varName) {
                     try {
-                        console.log(`[DB Connector] Macro fetching: ${url} -> ${varName}`);
-                        const response = await fetch(url);
+                        console.log(`[DB Connector] Macro fetching (sync): ${url} -> ${varName}`);
                         
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}`);
+                        // สร้าง Request แบบ Synchronous (ระบุพารามิเตอร์ที่ 3 เป็น false)
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('GET', url, false); 
+                        xhr.send(null);
+
+                        if (xhr.status === 200) {
+                            // ได้รับข้อมูลสำเร็จ
+                            const dataString = xhr.responseText;
+                            
+                            // บันทึกลงใน Local Variable
+                            setLocalVariable(varName, dataString);
+
+                            // คืนค่าไปแสดงผลใน Prompt ได้เลย เนื่องจากเป็น Synchronous
+                            return dataString;
+                        } else {
+                            console.error(`[DB Connector] Macro fetch failed: HTTP ${xhr.status}`);
+                            return "";
                         }
-
-                        const data = await response.json();
-                        const dataString = JSON.stringify(data);
-
-                        // บันทึกลงใน Local Variable
-                        setLocalVariable(varName, dataString);
-
-                        // คืนค่าไปแสดงผลใน Prompt
-                        return dataString;
                     } catch (error) {
-                        console.error("[DB Connector] Macro fetch failed:", error);
-                        return ""; // คืนค่าว่างหากเกิดข้อผิดพลาด
+                        console.error("[DB Connector] Macro fetch sync error:", error);
+                        return "";
                     }
                 } else {
                     console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}. Got:", fullInput);
