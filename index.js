@@ -80,21 +80,36 @@ jQuery(async () => {
                 { name: "var", type: MacroValueType.STRING, optional: true }
             ],
             handler: async (ctx) => {
-                // ใช้การ Join และ Split เพื่อรองรับทั้งแบบ : และ :: และไม่สับสนกับ : ใน URL
                 const fullInput = ctx.args.join("::");
                 const parts = fullInput.split("::");
-                
                 const url = parts[0]?.trim();
                 const varName = parts[1]?.trim();
 
                 if (url && varName) {
-                    console.log(`[DB Connector] Macro triggered: ${url} -> ${varName}`);
-                    const result = await dbGetHandler({ url, var: varName }, "");
-                    return result; // คืนค่าข้อมูลที่ดึงมาเพื่อให้แสดงผลใน Prompt
+                    try {
+                        console.log(`[DB Connector] Macro fetching: ${url} -> ${varName}`);
+                        const response = await fetch(url);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        const dataString = JSON.stringify(data);
+
+                        // บันทึกลงใน Local Variable
+                        setLocalVariable(varName, dataString);
+
+                        // คืนค่าไปแสดงผลใน Prompt
+                        return dataString;
+                    } catch (error) {
+                        console.error("[DB Connector] Macro fetch failed:", error);
+                        return ""; // คืนค่าว่างหากเกิดข้อผิดพลาด
+                    }
                 } else {
                     console.warn("[DB Connector] Macro usage error. Expected {{dbfetch::url::var}}. Got:", fullInput);
+                    return "";
                 }
-                return ""; 
             }
         });
 
